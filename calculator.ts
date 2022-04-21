@@ -12,7 +12,23 @@ export function calculateEntry(entry: Entry, unrealized: Unrealized[], valuta: V
 
   if (buy && sell && fiatUnits.includes(sell.unit)) {
     const value = getSellValueInNok(time, sell, valuta);
-    return { unrealized: [...unrealized, createUnrealizedEntry(entry, buy, fee, value)] };
+
+    if (fee == null || fee.unit === buy.unit) {
+      return { unrealized: [...unrealized, createUnrealizedEntry(entry, buy, fee, value)] };
+    }
+
+    if (!fee.unitPriceUsd) {
+      throw new Error(`Warning: missing fee price for: ${fee.unit} ${time.toISOString()}`);
+    }
+
+    const feeRealizedUsd = fee.unitPriceUsd * fee.amount;
+    const feeRealizedNok = findConversion(time, 'usd', valuta) * feeRealizedUsd;
+    const feeRealization = createRealizationEntry(time, fee.amount, fee.unit, feeRealizedNok, unrealized);
+
+    return {
+      unrealized: [...feeRealization.newUnrealized, createUnrealizedEntry(entry, buy, null, value)],
+      realized: [feeRealization.realized],
+    };
   }
 
   // Kjøp med crypto
@@ -60,12 +76,15 @@ export function calculateEntry(entry: Entry, unrealized: Unrealized[], valuta: V
 
   //Salg av krypto til fiat
   else if (sell && buy && fiatUnits.includes(buy.unit)) {
-    if (fee && fee.unit != buy.unit) {
+    // TODO: Convert when fee is not same unit as buy
+    if (fee && fee.unit != buy.unit && (buy.unit !== 'usd' || !fee.unitPriceUsd)) {
       throw new Error('Fee is not the same unit as buy');
     }
 
-    const realizedNok =
-      findConversion(time, buy.unit, valuta) * (buy.amount - (fee?.unit == buy.unit ? fee.amount : 0));
+    const feeAmount =
+      fee && fee.unit === buy.unit ? findConversion(time, buy.unit, valuta) * fee.amount : fee?.amount ?? 0;
+
+    const realizedNok = findConversion(time, buy.unit, valuta) * (buy.amount - feeAmount);
 
     const realization = createRealizationEntry(time, sell.amount, sell.unit, realizedNok, unrealized);
     return {
@@ -148,7 +167,8 @@ function createRealizationEntry(
   let buyValue = 0;
   let newUnrealized = unrealized;
 
-  while (remainingToRealize > 0.000000001) {
+  while (remainingToRealize > 1e-7) {
+    //TODO: Choose unrealized based on time.
     const toRealize = newUnrealized.find(v => v.unit === unit);
     if (!toRealize) {
       throw new Error('Could not find matching unit');

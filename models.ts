@@ -53,3 +53,8 @@ interface Deposit {
   unit: string;
   valueNok: number;
 }
+
+enum RealizationType {
+  First,
+  Last,
+}

@@ -1,9 +1,9 @@
 import { calculateEntry } from './calculator.js';
 import { getData, getValuta } from './parser.js';
 
-const yearCutoff = new Date(2021, 0, 1);
-const realizedFromCutoff = new Date(2019, 11, 31);
-const realizedToCutoff = new Date(2021, 0, 1);
+const yearCutoff = new Date(2022, 0, 1);
+const realizedFromCutoff = new Date(2020, 11, 31);
+const realizedToCutoff = new Date(2022, 0, 1);
 
 const valuta = getValuta('./valuta.csv');
 const groupedData = getData('./data.csv', yearCutoff);
